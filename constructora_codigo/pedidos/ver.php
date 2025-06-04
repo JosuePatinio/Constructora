@@ -10,10 +10,9 @@ $id_pedido = (int)$_GET['id'];
 
 // Obtener información del pedido
 $pedido = $conexion->query("
-    SELECT p.*, e.nombre AS empleado, c.nombre AS chofer 
+    SELECT p.*, e.nombre AS empleado 
     FROM pedidos p
-    JOIN empleados e ON p.id_empleado = e.id
-    JOIN choferes c ON p.id_chofer = c.id
+    JOIN empleados e ON p.idempleado = e.id
     WHERE p.id = $id_pedido
 ")->fetch_assoc();
 
@@ -91,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Obtener productos del pedido
 $productos = $conexion->query("
-    SELECT pp.*, pr.nombre_producto, pr.precio 
+    SELECT pp.*, pr.descripcion, pr.precio 
     FROM pedido_productos pp
     JOIN productos pr ON pp.id_producto = pr.id
     WHERE pp.id_pedido = $id_pedido
@@ -99,8 +98,8 @@ $productos = $conexion->query("
 
 // Obtener listas para los selects
 $empleados = $conexion->query("SELECT id, nombre FROM empleados")->fetch_all(MYSQLI_ASSOC);
-$choferes = $conexion->query("SELECT id, nombre FROM choferes")->fetch_all(MYSQLI_ASSOC);
-$todos_productos = $conexion->query("SELECT id, nombre_producto, precio FROM productos")->fetch_all(MYSQLI_ASSOC);
+
+$todos_productos = $conexion->query("SELECT id, descripcion, precio FROM productos")->fetch_all(MYSQLI_ASSOC);
 
 $titulo = "Pedido #" . $pedido['codigo_pedido'];
 $modo_edicion = isset($_GET['editar']) && $pedido['estado'] === 'pendiente';
@@ -229,7 +228,7 @@ ob_start();
                                             <option value="<?= $p['id'] ?>" 
                                                 <?= $p['id'] == $prod['id_producto'] ? 'selected' : '' ?>
                                                 data-precio="<?= $p['precio'] ?>">
-                                                <?= htmlspecialchars($p['nombre_producto']) ?> ($<?= number_format($p['precio'], 2) ?>)
+                                                <?= htmlspecialchars($p['descripcion']) ?> ($<?= number_format($p['precio'], 2) ?>)
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -274,7 +273,7 @@ ob_start();
                                     $total += $subtotal;
                                 ?>
                                 <tr>
-                                    <td><?= htmlspecialchars($prod['nombre_producto']) ?></td>
+                                    <td><?= htmlspecialchars($prod['descripcion']) ?></td>
                                     <td class="text-center"><?= $prod['cantidad'] ?></td>
                                     <td class="text-right">$<?= number_format($prod['precio'], 2) ?></td>
                                     <td class="text-right">$<?= number_format($subtotal, 2) ?></td>

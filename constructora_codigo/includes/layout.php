@@ -49,33 +49,40 @@
     }
     
     .sidebar {
-    background-color: #1E3A8A; 
-    color: rgba(255, 255, 255, 0.9); 
+        background-color: #1E3A8A; 
+        color: rgba(255, 255, 255, 0.9); 
+        width: 250px;
+        min-width: 250px;
     }
-
 
     /* Color principal de los links */
     .sidebar .nav-link {
         color: rgba(255, 255, 255, 0.8); 
-        text-decoration: none; /* Quita el subrayado */
-        transition: color 0.3s; /* Efecto suave al pasar el mouse */
+        text-decoration: none;
+        transition: color 0.3s;
+        padding: 10px 15px;
+        display: block;
+        border-left: 3px solid transparent;
     }
 
     /* Color al pasar el mouse (hover) */
     .sidebar .nav-link:hover {
         color: #ffffff !important; 
+        background-color: rgba(255,255,255,0.1);
     }
 
     /* Color cuando está activo (página actual) */
     .sidebar .nav-link.active {
         color: #ffffff !important; 
-        font-weight: 600; /* Texto en negrita */
+        font-weight: 600;
+        border-left: 3px solid var(--success);
+        background-color: rgba(255,255,255,0.15);
     }
     
     .sidebar-header {
-    background-color: rgba(0,0,0,0.1); /* oscurecimiento */
-    padding: 25px;
-    margin-bottom: 10px;
+        background-color: rgba(0,0,0,0.1);
+        padding: 25px;
+        margin-bottom: 10px;
     }
     
     .sidebar-header h2 {
@@ -92,6 +99,8 @@
     
     .main-content {
         flex: 1;
+        display: flex;
+        flex-direction: column;
     }
     
     /* Top Bar */
@@ -117,6 +126,8 @@
     /* Contenedor Principal */
     .content-container {
         padding: 25px;
+        flex: 1;
+        background-color: #F3F4F6;
     }
     
     /* Cards */
@@ -125,6 +136,7 @@
         border-radius: 8px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.05);
         margin-bottom: 25px;
+        border: none;
     }
     
     .card-header {
@@ -134,6 +146,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        border-radius: 8px 8px 0 0 !important;
     }
     
     .card-title {
@@ -207,10 +220,10 @@
     
     /* Badges */
     .badge {
-    padding: 0.35em 0.65em;
-    font-size: 0.75em;
-    font-weight: 700;
-    border-radius: 0.25rem;
+        padding: 0.35em 0.65em;
+        font-size: 0.75em;
+        font-weight: 700;
+        border-radius: 0.25rem;
     }
 
     .estado-pendiente {
@@ -261,36 +274,79 @@
     .form-control:focus {
         outline: none;
         border-color: var(--secondary);
+        box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25);
     }
     
     .full-width {
         grid-column: 1 / -1;
     }
+
+    /* Mejoras para el menú de navegación */
+    .nav-menu {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .nav-item {
+        margin-bottom: 5px;
+    }
+
+    .user-menu {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .user-name {
+        font-weight: 500;
+    }
     </style>
 </head>
 <body>
 <div class="app-container">
-    <!-- Sidebar -->
+    <!-- Sidebar simplificado -->
     <div class="sidebar">
         <div class="sidebar-header">
             <h2><i class="fas fa-building"></i> Constructora</h2>
         </div>
+        <!-- Sidebar corregido -->
         <ul class="nav-menu">
-            <li class="nav-item"><a href="../index.php" class="nav-link"><i class="fas fa-home"></i> Inicio</a></li>
-            <li class="nav-item"><a href="listar.php" class="nav-link active"><i class="fas fa-truck"></i> Pedidos</a></li>
-            <li class="nav-item"><a href="listar_choferes.php" class="nav-link"><i class="fas fa-id-card"></i> Choferes</a></li>
-            <li class="nav-item"><a href="listar_empleados.php" class="nav-link"><i class="fas fa-users"></i> Empleados</a></li>
+            <li class="nav-item">
+                <a href="../index.php" class="nav-link">
+                    <i class="fas fa-home"></i> Inicio
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="../pedidos/listar.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'listar.php' ? 'active' : '' ?>">
+                    <i class="fas fa-truck"></i> Pedidos
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="../pedidos/agregar.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'agregar.php' ? 'active' : '' ?>">
+                    <i class="fas fa-plus-circle"></i> Nuevo Pedido
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="../mantenimiento_unidades/mantenimiento.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'mantenimiento.php' ? 'active' : '' ?>">
+                    <i class="fas fa-tools"></i> Mantenimiento
+                </a>
+            </li>
         </ul>
-    </div>
+
+        </div>
     
     <!-- Main Content -->
     <div class="main-content">
         <div class="top-bar">
             <div class="breadcrumbs">
-                <a href="../index.php">Inicio</a> / <span>Pedidos</span>
+                <a href="../index.php">Inicio</a> / <span><?= $titulo ?? 'Panel' ?></span>
             </div>
             <div class="user-menu">
-                <span class="user-name">Usuario Actual</span>
+                <span class="user-name"><?= $_SESSION['usuario']['nombre'] ?? 'Usuario' ?></span>
+                <a href="../includes/logout.php" class="btn btn-sm btn-outline-danger">
+                    <i class="fas fa-sign-out-alt"></i> Salir
+                </a>
             </div>
         </div>
         
@@ -305,14 +361,22 @@ $(document).ready(function() {
     // Inicializar Select2
     $('.select2').select2({
         width: '100%',
-        placeholder: 'Selecciona una opción'
+        placeholder: 'Selecciona una opción',
+        dropdownParent: $('.content-container')
     });
     
     // Datepicker
     $("input[name='fecha_pedido']").datepicker({
         dateFormat: 'yy-mm-dd',
         changeMonth: true,
-        changeYear: true
+        changeYear: true,
+        yearRange: '2023:2025'
+    });
+
+    // Mostrar el nombre del archivo en inputs de tipo file
+    $('input[type="file"]').change(function(e) {
+        var fileName = e.target.files[0].name;
+        $(this).next('.custom-file-label').html(fileName);
     });
 });
 </script>

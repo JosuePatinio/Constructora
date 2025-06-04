@@ -31,6 +31,9 @@ $usuario = obtenerUsuario();
                     <a href="pedidos/listar.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-list"></i> Ver Pedidos
                     </a>
+                    <a href="mantenimiento_unidades/mantenimiento.php" class="list-group-item list-group-item-action">
+                        <i class="fas fa-plus-circle"></i> Mantenimiento de unidades
+                    </a>
                 </div>
             </div>
         </div>
