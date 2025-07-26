@@ -1,5 +1,7 @@
 <?php
 include('../includes/conexion.php');
+include('../includes/auth.php');
+verificarSesion();
 
 if (!isset($_GET['id'])) {
     header('Location: listar.php');
@@ -10,9 +12,12 @@ $id_pedido = (int)$_GET['id'];
 
 // Obtener información del pedido
 $pedido = $conexion->query("
-    SELECT p.*, e.nombre AS empleado 
+    SELECT p.*, 
+           e_reg.nombre AS empleado_registra,
+           e_chofer.nombre AS chofer
     FROM pedidos p
-    JOIN empleados e ON p.idempleado = e.id
+    JOIN empleados e_reg ON p.id_empleado_registra = e_reg.idempleado
+    LEFT JOIN empleados e_chofer ON p.id_empleado_chofer = e_chofer.idempleado
     WHERE p.id = $id_pedido
 ")->fetch_assoc();
 
@@ -21,7 +26,6 @@ if (!$pedido) {
     exit;
 }
 
-// Procesar actualización si se envió el formulario
 $mensaje_exito = '';
 $mensaje_error = '';
 
@@ -29,44 +33,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $conexion->begin_transaction();
     
     try {
-        // Validar campos requeridos
-        $campos_requeridos = ['id_empleado', 'id_chofer', 'fecha_pedido'];
-        foreach ($campos_requeridos as $campo) {
-            if (empty($_POST[$campo])) {
-                throw new Exception("El campo {$campo} es obligatorio");
+        if (empty($_POST['fecha_pedido'])) {
+            throw new Exception("La fecha del pedido es obligatoria");
+        }
+
+        $id_chofer = !empty($_POST['id_empleado_chofer']) ? (int)$_POST['id_empleado_chofer'] : null;
+        $fecha_pedido = $_POST['fecha_pedido'];
+        $observaciones = $_POST['observaciones'] ?? '';
+
+        if ($id_chofer !== null) {
+            $chofer_valido = $conexion->query("
+                SELECT 1 FROM empleados 
+                WHERE idempleado = $id_chofer AND tipo_puesto = 'Chofer'
+            ")->num_rows;
+            if (!$chofer_valido) {
+                throw new Exception("El chofer seleccionado no es válido");
             }
         }
 
-        // Actualizar datos principales del pedido
         $stmt = $conexion->prepare("UPDATE pedidos SET 
-            id_empleado = ?,
-            id_chofer = ?,
+            id_empleado_chofer = ?,
             fecha_pedido = ?,
             observaciones = ?
             WHERE id = ?");
-        
-        $stmt->bind_param("iissi", 
-            $_POST['id_empleado'],
-            $_POST['id_chofer'],
-            $_POST['fecha_pedido'],
-            $_POST['observaciones'],
-            $id_pedido
-        );
-        
+        $stmt->bind_param("issi", $id_chofer, $fecha_pedido, $observaciones, $id_pedido);
+
         if (!$stmt->execute()) {
             throw new Exception("Error al actualizar el pedido: " . $conexion->error);
         }
 
-        // Actualizar productos
         $conexion->query("DELETE FROM pedido_productos WHERE id_pedido = $id_pedido");
-        
+
         if (!empty($_POST['productos'])) {
-            $stmt_detalle = $conexion->prepare("INSERT INTO pedido_productos (id_pedido, id_producto, cantidad) VALUES (?, ?, ?)");
-            
-            foreach ($_POST['productos'] as $index => $id_producto) {
-                if (!empty($id_producto)) {
+            $stmt_detalle = $conexion->prepare("INSERT INTO pedido_productos (id_pedido, idproducto, cantidad) VALUES (?, ?, ?)");
+            foreach ($_POST['productos'] as $index => $idproducto) {
+                if (!empty($idproducto)) {
                     $cantidad = (int)($_POST['cantidades'][$index] ?? 1);
-                    $stmt_detalle->bind_param("iii", $id_pedido, $id_producto, $cantidad);
+                    $stmt_detalle->bind_param("iii", $id_pedido, $idproducto, $cantidad);
                     $stmt_detalle->execute();
                 }
             }
@@ -74,13 +77,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $conexion->commit();
         $mensaje_exito = 'Pedido actualizado correctamente';
-        
-        // Recargar los datos del pedido
-        $pedido = $conexion->query("SELECT p.*, e.nombre AS empleado, c.nombre AS chofer 
-                                  FROM pedidos p
-                                  JOIN empleados e ON p.id_empleado = e.id
-                                  JOIN choferes c ON p.id_chofer = c.id
-                                  WHERE p.id = $id_pedido")->fetch_assoc();
+
+        // Recargar datos
+        $pedido = $conexion->query("
+            SELECT p.*, 
+                   e_reg.nombre AS empleado_registra,
+                   e_chofer.nombre AS chofer
+            FROM pedidos p
+            JOIN empleados e_reg ON p.id_empleado_registra = e_reg.idempleado
+            LEFT JOIN empleados e_chofer ON p.id_empleado_chofer = e_chofer.idempleado
+            WHERE p.id = $id_pedido
+        ")->fetch_assoc();
         
     } catch (Exception $e) {
         $conexion->rollback();
@@ -88,18 +95,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Obtener productos del pedido
-$productos = $conexion->query("
-    SELECT pp.*, pr.descripcion, pr.precio 
+// Obtener choferes
+$choferes = $conexion->query("
+    SELECT idempleado as id, nombre
+    FROM empleados 
+    WHERE tipo_puesto = 'Chofer'
+    ORDER BY nombre ASC
+")->fetch_all(MYSQLI_ASSOC);
+
+// Obtener productos disponibles
+$todos_productos = $conexion->query("
+    SELECT idproducto as id, descripcion, precio 
+    FROM productos
+")->fetch_all(MYSQLI_ASSOC);
+
+// Obtener productos del pedido actual
+$productos_pedido = $conexion->query("
+    SELECT pp.idproducto, pp.cantidad, pr.descripcion, pr.precio
     FROM pedido_productos pp
-    JOIN productos pr ON pp.id_producto = pr.id
+    JOIN productos pr ON pp.idproducto = pr.idproducto
     WHERE pp.id_pedido = $id_pedido
-");
+")->fetch_all(MYSQLI_ASSOC);
 
-// Obtener listas para los selects
-$empleados = $conexion->query("SELECT id, nombre FROM empleados")->fetch_all(MYSQLI_ASSOC);
-
-$todos_productos = $conexion->query("SELECT id, descripcion, precio FROM productos")->fetch_all(MYSQLI_ASSOC);
+if (empty($productos_pedido)) {
+    $productos_pedido = [['idproducto' => '', 'cantidad' => 1, 'descripcion' => '', 'precio' => 0]];
+}
 
 $titulo = "Pedido #" . $pedido['codigo_pedido'];
 $modo_edicion = isset($_GET['editar']) && $pedido['estado'] === 'pendiente';
@@ -138,104 +158,76 @@ ob_start();
         <?php endif; ?>
 
         <form method="post" id="form-pedido">
-            <div class="row">
+            <div class="row mb-3">
                 <div class="col-md-6">
-                    <div class="form-group">
-                        <label>Empleado</label>
-                        <?php if ($modo_edicion): ?>
-                            <select name="id_empleado" class="form-control select2" required>
-                                <?php foreach ($empleados as $e): ?>
-                                    <option value="<?= $e['id'] ?>" <?= $e['id'] == $pedido['id_empleado'] ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($e['nombre']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        <?php else: ?>
-                            <p class="form-control-static"><?= htmlspecialchars($pedido['empleado']) ?></p>
-                        <?php endif; ?>
-                    </div>
+                    <label>Registrado por</label>
+                    <p class="form-control-static"><?= htmlspecialchars($pedido['empleado_registra']) ?></p>
                 </div>
                 <div class="col-md-6">
-                    <div class="form-group">
-                        <label>Chofer</label>
-                        <?php if ($modo_edicion): ?>
-                            <select name="id_chofer" class="form-control select2" required>
-                                <?php foreach ($choferes as $c): ?>
-                                    <option value="<?= $c['id'] ?>" <?= $c['id'] == $pedido['id_chofer'] ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($c['nombre']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        <?php else: ?>
-                            <p class="form-control-static"><?= htmlspecialchars($pedido['chofer']) ?></p>
-                        <?php endif; ?>
-                    </div>
+                    <label>Chofer</label>
+                    <?php if ($modo_edicion): ?>
+                        <select name="id_empleado_chofer" class="form-control select2" required>
+                            <option value="">Sin asignar</option>
+                            <?php foreach ($choferes as $c): ?>
+                                <option value="<?= $c['id'] ?>" <?= ($c['id'] == $pedido['id_empleado_chofer']) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($c['nombre']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    <?php else: ?>
+                        <p class="form-control-static"><?= htmlspecialchars($pedido['chofer'] ?? 'Sin asignar') ?></p>
+                    <?php endif; ?>
                 </div>
             </div>
 
-            <div class="row">
+            <div class="row mb-3">
                 <div class="col-md-6">
-                    <div class="form-group">
-                        <label>Fecha</label>
-                        <?php if ($modo_edicion): ?>
-                            <input type="date" name="fecha_pedido" class="form-control" 
-                                   value="<?= htmlspecialchars($pedido['fecha_pedido']) ?>" required>
-                        <?php else: ?>
-                            <p class="form-control-static">
-                                <?= date('d/m/Y', strtotime($pedido['fecha_pedido'])) ?>
-                            </p>
-                        <?php endif; ?>
-                    </div>
+                    <label>Fecha *</label>
+                    <?php if ($modo_edicion): ?>
+                        <input type="date" name="fecha_pedido" class="form-control" 
+                               value="<?= htmlspecialchars($pedido['fecha_pedido']) ?>" required>
+                    <?php else: ?>
+                        <p class="form-control-static"><?= date('d/m/Y', strtotime($pedido['fecha_pedido'])) ?></p>
+                    <?php endif; ?>
                 </div>
                 <div class="col-md-6">
-                    <div class="form-group">
-                        <label>Estado</label>
-                        <p class="form-control-static">
-                            <span class="badge <?php
-                                echo match(strtolower($pedido['estado'])) {
-                                    'pendiente' => 'bg-warning text-dark',
-                                    'en proceso' => 'bg-info text-white',
-                                    'finalizado' => 'bg-success text-white',
-                                    'cancelado' => 'bg-danger text-white',
-                                    default => 'bg-secondary text-white'
-                                };
-                            ?>">
-                                <?= ucfirst($pedido['estado']) ?>
-                            </span>
-                        </p>
-                    </div>
+                    <label>Estado</label>
+                    <p class="form-control-static">
+                        <span class="badge 
+                        <?= match(strtolower($pedido['estado'])) {
+                            'pendiente' => 'bg-warning text-dark',
+                            'en proceso' => 'bg-info text-white',
+                            'finalizado' => 'bg-success text-white',
+                            'cancelado' => 'bg-danger text-white',
+                            default => 'bg-secondary text-white'
+                        } ?>">
+                            <?= ucfirst($pedido['estado']) ?>
+                        </span>
+                    </p>
                 </div>
             </div>
 
-            <div class="form-group">
+            <div class="form-group mb-4">
                 <label>Productos</label>
                 <?php if ($modo_edicion): ?>
                     <div id="productos-container">
-                        <?php 
-                        $productos_array = $productos->fetch_all(MYSQLI_ASSOC);
-                        if (empty($productos_array)) {
-                            $productos_array = [['id_producto' => '', 'cantidad' => 1]];
-                        }
-                        
-                        foreach ($productos_array as $index => $prod): 
-                        ?>
+                        <?php foreach ($productos_pedido as $index => $prod): ?>
                         <div class="producto-item mb-3">
                             <div class="row g-2">
                                 <div class="col-md-7">
-                                    <select name="productos[]" class="form-control select2-producto" required>
+                                    <select name="productos[]" class="form-control" required>
                                         <option value="">Seleccionar producto</option>
                                         <?php foreach ($todos_productos as $p): ?>
                                             <option value="<?= $p['id'] ?>" 
-                                                <?= $p['id'] == $prod['id_producto'] ? 'selected' : '' ?>
-                                                data-precio="<?= $p['precio'] ?>">
-                                                <?= htmlspecialchars($p['descripcion']) ?> ($<?= number_format($p['precio'], 2) ?>)
+                                                <?= ($p['id'] == $prod['idproducto']) ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($p['descripcion']) ?> - $<?= number_format($p['precio'], 2) ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="col-md-3">
                                     <input type="number" name="cantidades[]" class="form-control" 
-                                           min="1" value="<?= $prod['cantidad'] ?>" required>
+                                        min="1" value="<?= $prod['cantidad'] ?>" required>
                                 </div>
                                 <div class="col-md-2">
                                     <?php if ($index === 0): ?>
@@ -252,7 +244,6 @@ ob_start();
                         </div>
                         <?php endforeach; ?>
                     </div>
-                    <small class="text-muted">Mínimo 1 producto requerido</small>
                 <?php else: ?>
                     <div class="table-responsive">
                         <table class="table table-bordered">
@@ -267,8 +258,7 @@ ob_start();
                             <tbody>
                                 <?php 
                                 $total = 0;
-                                $productos->data_seek(0); // Reiniciar puntero
-                                while ($prod = $productos->fetch_assoc()): 
+                                foreach ($productos_pedido as $prod): 
                                     $subtotal = $prod['precio'] * $prod['cantidad'];
                                     $total += $subtotal;
                                 ?>
@@ -278,7 +268,7 @@ ob_start();
                                     <td class="text-right">$<?= number_format($prod['precio'], 2) ?></td>
                                     <td class="text-right">$<?= number_format($subtotal, 2) ?></td>
                                 </tr>
-                                <?php endwhile; ?>
+                                <?php endforeach; ?>
                             </tbody>
                             <tfoot>
                                 <tr>
@@ -291,7 +281,7 @@ ob_start();
                 <?php endif; ?>
             </div>
 
-            <div class="form-group">
+            <div class="form-group mb-4">
                 <label>Observaciones</label>
                 <?php if ($modo_edicion): ?>
                     <textarea name="observaciones" class="form-control" rows="3"><?= htmlspecialchars($pedido['observaciones']) ?></textarea>
@@ -319,23 +309,17 @@ ob_start();
 <?php if ($modo_edicion): ?>
 <script>
 $(document).ready(function() {
-    // Inicializar Select2
-    $('.select2').select2({
-        width: '100%',
-        placeholder: 'Seleccione una opción'
-    });
+    
+    $('.select2, .select-producto').select2({ width: '100%' });
 
-    // Añadir nuevo producto
     $(document).on('click', '.btn-add-producto', function() {
         const newItem = $('.producto-item:first').clone();
-        newItem.find('select').val('').trigger('change');
+        newItem.find('select').val('');
         newItem.find('input').val('1');
         newItem.find('.btn-add-producto')
-            .removeClass('btn-success')
-            .addClass('btn-danger')
-            .html('<i class="fas fa-minus"></i>')
-            .removeClass('btn-add-producto')
-            .addClass('btn-remove-producto');
+            .removeClass('btn-success btn-add-producto')
+            .addClass('btn-danger btn-remove-producto')
+            .html('<i class="fas fa-minus"></i>');
         $('#productos-container').append(newItem);
     });
 
@@ -344,43 +328,25 @@ $(document).ready(function() {
         if ($('.producto-item').length > 1) {
             $(this).closest('.producto-item').remove();
         } else {
-            Swal.fire('Advertencia', 'Debe haber al menos un producto', 'warning');
+            alert('Debe haber al menos un producto');
         }
     });
 
-    // Validación del formulario
+    // Validación básica al enviar
     $('#form-pedido').on('submit', function(e) {
-        e.preventDefault();
-        
-        let isValid = true;
-        $(this).find('[required]').each(function() {
+        let valid = true;
+        $('select[name="productos[]"]').each(function() {
             if (!$(this).val()) {
                 $(this).addClass('is-invalid');
-                isValid = false;
+                valid = false;
             } else {
                 $(this).removeClass('is-invalid');
             }
         });
-
-        if (!isValid) {
-            Swal.fire('Error', 'Por favor complete todos los campos obligatorios', 'error');
-            return;
+        if (!valid) {
+            e.preventDefault();
+            alert('Seleccione productos válidos para todos los items');
         }
-
-        Swal.fire({
-            title: '¿Guardar cambios?',
-            text: '¿Está seguro que desea actualizar este pedido?',
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonColor: '#234076',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Sí, guardar',
-            cancelButtonText: 'Cancelar'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                this.submit();
-            }
-        });
     });
 });
 </script>

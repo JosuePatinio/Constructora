@@ -220,35 +220,10 @@
     
     /* Badges */
     .badge {
-        padding: 0.35em 0.65em;
+        padding: 0.50em 0.65em;
         font-size: 0.75em;
         font-weight: 700;
         border-radius: 0.25rem;
-    }
-
-    .estado-pendiente {
-        background-color:rgba(255, 193, 7, 0.77);
-        color: #000;
-    }
-
-    .estado-proceso {
-        background-color:rgb(140, 147, 222);
-        color: #000;
-    }
-
-    .estado-finalizado {
-        background-color: #198754;
-        color: #fff;
-    }
-
-    .estado-cancelado {
-        background-color: #dc3545;
-        color: #fff;
-    }
-
-    .estado-default {
-        background-color: #6c757d;
-        color: #fff;
     }
         
     /* Formularios */
@@ -301,6 +276,88 @@
     .user-name {
         font-weight: 500;
     }
+
+        /* Estilos para el selector de choferes */
+    .chofer-option {
+        padding: 5px 0;
+        display: block;
+    }
+
+    .chofer-selection {
+        vertical-align: middle;
+    }
+
+    .select2-container--default .select2-results__option[aria-selected=true] {
+        background-color: #f8f9fa;
+    }
+
+    .select2-container--default .select2-results__option--highlighted[aria-selected] {
+        background-color: #234076;
+    }
+
+    .bg-orange {
+        background-color: #fd7e14;
+    }
+
+    /* Ajuste para badges en las opciones */
+    .chofer-option .badge {
+        font-size: 0.75em;
+        vertical-align: middle;
+    }
+
+
+    /* Estilos para el cambio de estado */
+    .status-change-popup {
+        max-width: 500px;
+        border-radius: 10px;
+    }
+
+    .status-options-container {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+        margin-top: 15px;
+    }
+
+    .status-option {
+        padding: 15px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: white;
+        border: 1px solid #eee;
+    }
+
+    .status-option:hover {
+        background: #f9f9f9;
+    }
+
+    .status-option.selected {
+        border: 2px solid #4e73df;
+        background-color: #f8f9fc;
+    }
+
+    .status-badge {
+        padding: 8px 12px;
+        border-radius: 20px;
+        font-weight: 600;
+        text-align: center;
+        margin-bottom: 8px;
+        font-size: 14px;
+    }
+
+    .status-description {
+        font-size: 12px;
+        color: #666;
+        text-align: center;
+    }
+    
+    .bg-warning { background-color: #ffc107; color: #000; }
+    .bg-info { background-color: #17a2b8; color: #fff; }
+    .bg-success { background-color: #28a745; color: #fff; }
+    .bg-danger { background-color: #dc3545; color: #fff; }
+    .bg-secondary { background-color: #6c757d; color: #fff; }
+
     </style>
 </head>
 <body>

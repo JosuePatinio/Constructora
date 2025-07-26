@@ -31,6 +31,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     try {
         // Validación de campos obligatorios
+
+        if (empty($_POST['nombre_cliente']) || empty($_POST['domicilio_cliente'])) {
+            throw new Exception("Nombre y domicilio del cliente son obligatorios");
+        }
+
         if (empty($_POST['fecha_pedido'])) {
             throw new Exception("La fecha del pedido es obligatoria");
         }
@@ -44,15 +49,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             id_empleado_registra, 
             id_empleado_chofer, 
             fecha_pedido, 
+            nombre_cliente,
+            domicilio_cliente,
+            telefono_cliente,
             observaciones,
             estado
-        ) VALUES (?, ?, ?, ?, ?, 'pendiente')");
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pendiente')");
         
-        $stmt->bind_param("siiss", 
+        $stmt->bind_param("siisssss", 
             $codigo_pedido,
             $usuario['idempleado'], // Usuario actual de la sesión
             $_POST['id_empleado_chofer'],
             $_POST['fecha_pedido'],
+            $_POST['nombre_cliente'],    
+            $_POST['domicilio_cliente'],
+            $_POST['telefono_cliente'], 
             $_POST['observaciones']
         );
         
@@ -162,6 +173,33 @@ ob_start();
                     </div>
                 </div>
             </div>
+
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label class="form-label">Nombre del Cliente *</label>
+                        <input type="text" name="nombre_cliente" class="form-control" 
+                            value="<?= htmlspecialchars($_POST['nombre_cliente'] ?? '') ?>" required>
+                        <div class="invalid-feedback">Ingrese el nombre del cliente</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label class="form-label">Domicilio *</label>
+                        <input type="text" name="domicilio_cliente" class="form-control" 
+                            value="<?= htmlspecialchars($_POST['domicilio_cliente'] ?? '') ?>" required>
+                        <div class="invalid-feedback">Ingrese el domicilio</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label class="form-label">Teléfono</label>
+                        <input type="text" name="telefono_cliente" class="form-control" 
+                            value="<?= htmlspecialchars($_POST['telefono_cliente'] ?? '') ?>">
+                    </div>
+                </div>
+            </div>
+
 
             <div class="form-group mb-4">
                 <label class="form-label">Productos *</label>
